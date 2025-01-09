@@ -1,216 +1,151 @@
-# CT Artifact Simulation Overview 🔬
+# CT Artifact Simulation Overview
 
-This document provides a comprehensive overview of the various CT artifacts that have been simulated in this project. Each artifact type is implemented to mimic realistic CT imaging challenges.
+This document provides a comprehensive overview of the various CT artifacts that have been simulated in this project. Each artifact type is implemented to mimic realistic CT imaging challenges, with parameters chosen to represent both typical clinical scenarios and extreme test cases.
 
-## 📊 Detailed Augmentation Parameters
+## 1. Parameter Summary Tables
 
-| Category | Scenario | Parameters | Description |
-|:---------|:---------|:-----------|:------------|
-| **Slice Thickness** | Ultra-thin | 0.5mm | Highest resolution, increased noise |
-| | Thin | 1.0mm | High detail visualization |
-| | Standard | 2.5mm | Typical clinical protocol |
-| | Thick | 5.0mm | Reduced noise, less detail |
-| | Extra thick | 7.0mm | Further detail reduction |
-| | Very thick | 10.0mm | Maximum thickness tested |
-| **Noise** | Low | Gaussian σ=30 | Minimal electronic noise |
-| | Moderate | Gaussian σ=60 | Typical clinical noise |
-| | Heavy | Gaussian σ=100 | Challenging noise level |
-| | Very high | Gaussian σ=150 | Extreme noise case |
-| | Typical artifacts | S&P 2% | Common detector artifacts |
-| | Strong artifacts | S&P 5% | Significant artifacts |
-| | Severe artifacts | S&P 20% | Maximum artifact case |
-| **Motion** | Mild breathing | 3px X, 0px Y | Normal respiratory motion |
-| | Normal movement | 7px X, 2px Y | Typical patient movement |
-| | Large movement | 20px X, 10px Y | Significant motion |
-| | Extreme movement | 30px X, 15px Y | Worst-case scenario |
-| **Beam Hardening** | Mild | 30%, 180 HU | Minimal dark bands |
-| | Moderate | 50%, 250 HU | Typical clinical appearance |
-| | Strong | 80%, 300 HU | Pronounced artifacts |
-| | Very strong | 90%, 150 HU | Severe dark bands |
-| | Extreme | 100%, 400 HU | Maximum artifact case |
-| **Ring Artifacts** | Subtle | 2 rings, 30% | Minor detector issues |
-| | Moderate | 4 rings, 50% | Visible ring patterns |
-| | Multiple defects | 8 rings, 70% | Multiple detector problems |
-| | Multiple strong | 8 rings, 80% | Severe ring patterns |
-| | Maximum | 12 rings, 100% | Worst-case scenario |
-| **Low-Dose** | Moderate reduction | 70% dose | Minor quality impact |
-| | Significant reduction | 50% dose | Noticeable quality loss |
-| | Very low | 20% dose | Significant degradation |
-| | Ultra-low | 10% dose | Maximum dose reduction |
-| **Patient Positioning** | Slight head tilt | 5° X-axis | Minor misalignment |
-| | Moderate lateral | 10° Y-axis | Common positioning variation |
-| | Slight rotation | 8° Z-axis | Typical rotation |
-| | Large head tilt | 15° X-axis | Significant misalignment |
-| | Severe lateral | 25° Y-axis | Extreme positioning |
-| | Combined rotation | 10° all axes | Complex misalignment |
+### Slice Thickness Parameters
+| Scenario | Value (mm) | Description |
+|:---------|:-----------|:------------|
+| Ultra-thin | 0.5 | Highest resolution, increased noise characteristics |
+| Thin | 1.0 | High detail visualization, moderate noise |
+| Standard | 2.5 | Typical clinical protocol, balanced noise/detail |
+| Thick | 5.0 | Reduced noise, decreased detail resolution |
+| Extra thick | 7.0 | Further detail reduction, minimal noise |
+| Very thick | 10.0 | Maximum thickness tested, significant detail loss |
 
+### Noise Parameters
+| Type | Parameters | Clinical Impact |
+|:-----|:-----------|:---------------|
+| Low Electronic | Gaussian σ=30 | Minimal impact on diagnosis |
+| Moderate Electronic | Gaussian σ=60 | Typical clinical noise levels |
+| Heavy Electronic | Gaussian σ=100 | May impact fine detail visibility |
+| Very High | Gaussian σ=150 | Significant diagnostic challenges |
+| Typical Detector | S&P 2% | Common detector-related artifacts |
+| Strong Detector | S&P 5% | Notable impact on image quality |
+| Severe Detector | S&P 20% | Maximum tested artifact case |
 
-# 🛠️ Implementation Details
+### Motion Parameters
+| Scenario | Movement (pixels) | Clinical Context |
+|:---------|:-----------------|:-----------------|
+| Mild breathing | 3px X, 0px Y | Normal respiratory motion |
+| Normal movement | 7px X, 2px Y | Typical patient movement |
+| Large movement | 20px X, 10px Y | Significant patient motion |
+| Extreme movement | 30px X, 15px Y | Worst-case scenario |
 
-## 1. Motion Artifacts 🌊
+### Beam Hardening Parameters
+| Severity | Parameters | Effect |
+|:---------|:-----------|:--------|
+| Mild | 30%, 180 HU | Minimal dark bands |
+| Moderate | 50%, 250 HU | Standard clinical appearance |
+| Strong | 80%, 300 HU | Pronounced artifacts |
+| Very strong | 90%, 150 HU | Severe dark bands |
+| Extreme | 100%, 400 HU | Maximum artifact intensity |
 
-Motion artifacts are simulated using the ASTRA toolbox to recreate realistic patient movement effects during CT acquisition.
+### Ring Artifact Parameters
+| Severity | Configuration | Impact |
+|:---------|:--------------|:--------|
+| Subtle | 2 rings, 30% intensity | Minor detector issues |
+| Moderate | 4 rings, 50% intensity | Visible ring patterns |
+| Multiple defects | 8 rings, 70% intensity | Multiple detector problems |
+| Multiple strong | 8 rings, 80% intensity | Severe ring patterns |
+| Maximum | 12 rings, 100% intensity | Worst-case scenario |
 
-### Parameters Tested:
-- 🌟 Mild breathing: 3px horizontal motion
-- 🌟 Normal movement: 7px horizontal, 2px vertical motion
-- 🌟 Large movement: 20px horizontal, 10px vertical motion
-- 🌟 Extreme movement: 30px horizontal, 15px vertical motion
+### Dose Reduction Parameters
+| Level | Dose Percentage | Image Quality Impact |
+|:------|:----------------|:-------------------|
+| Moderate reduction | 70% | Minor quality degradation |
+| Significant reduction | 50% | Noticeable quality loss |
+| Very low | 20% | Significant degradation |
+| Ultra-low | 10% | Maximum dose reduction |
 
-### Technical Implementation:
-The motion simulation uses a physics-based approach that:
-- 📡 Simulates CT scanner geometry and projection-reconstruction process using ASTRA toolbox:
-  - Parallel beam geometry with 672 detector pixels
+### Patient Positioning Parameters
+| Scenario | Rotation | Clinical Context |
+|:---------|:---------|:----------------|
+| Slight head tilt | 5° X-axis | Minor misalignment |
+| Moderate lateral | 10° Y-axis | Common positioning variation |
+| Slight rotation | 8° Z-axis | Typical rotation |
+| Large head tilt | 15° X-axis | Significant misalignment |
+| Severe lateral | 25° Y-axis | Extreme positioning |
+| Combined rotation | 10° all axes | Complex misalignment |
+
+## 2. Technical Implementation Details
+
+### Motion Artifact Simulation
+Motion artifacts are simulated using the ASTRA toolbox for realistic patient movement effects during CT acquisition.
+
+Implementation characteristics:
+- Scanner geometry simulation:
+  - Parallel beam geometry (672 detector pixels)
   - 360 projection angles over 2π radians
-  - Strip-based projection model for accurate ray tracing
-- 🔄 Applies motion during specific projection angles
-- 🔍 Uses Filtered Back Projection (FBP) for reconstruction
-- ✨ Applies subtle Gaussian filtering for realism
+  - Strip-based projection model
+- Motion application during projection acquisition
+- Filtered Back Projection (FBP) reconstruction
+- Post-processing with Gaussian filtering
 
-Reference implementation: `motion_cli.py`
+Reference: `motion_cli.py`
 
-## 2. Low-Dose (Undersampling) Artifacts 📉
+### Low-Dose Simulation
+Implements reduced radiation dose effects through projection undersampling.
 
-Simulates the effects of reduced radiation dose through projection undersampling.
-
-### Parameters Tested:
-- 🌟 Moderate dose reduction: 70% of normal dose (30% reduction)
-- 🌟 Significant dose reduction: 50% of normal dose
-- 🌟 Very low dose: 20% of normal dose
-- 🌟 Ultra-low dose: 10% of normal dose
-
-### Technical Implementation:
-- 📡 Uses ASTRA toolbox for realistic sinogram generation:
+Technical approach:
+- ASTRA toolbox integration:
   - Parallel beam geometry configuration
-  - Strip-based projector model for accurate physics simulation
-  - Full 360° angular sampling with configurable projection count
-- 📊 Reduces number of projections proportional to dose reduction
-- 🔍 Maintains proper noise characteristics through:
-  - Preservation of original projection statistics
-  - Appropriate scaling of noise based on dose reduction
-- 🔄 Implements FBP reconstruction with dose-specific filtering
+  - Strip-based projector model
+  - Full 360° angular sampling
+- Projection count reduction proportional to dose
+- Noise characteristic preservation:
+  - Original projection statistics maintained
+  - Dose-dependent noise scaling
+- FBP reconstruction with adaptive filtering
 
-## 3. Slice Thickness Variations 📏
+### Slice Thickness Variation
+Implements variable slice thickness common in clinical protocols.
 
-Simulates different slice thickness settings commonly used in clinical practice.
+Key features:
+- Cubic interpolation for resampling
+- In-plane resolution preservation
+- DICOM metadata updating
+- Physical dimension maintenance
 
-### Parameters Tested:
-- 🌟 Ultra-thin: 0.5mm
-- 🌟 Thin slices: 1.0mm
-- 🌟 Standard slices: 2.5mm
-- 🌟 Thick slices: 5.0mm
-- 🌟 Extra thick slices: 7.0mm
-- 🌟 Very thick slices: 10.0mm
+### Noise Variation
+Simulates electronic and detector-based noise patterns.
 
-### Technical Implementation:
-- 📊 Uses cubic interpolation for high-quality resampling
-- 🔍 Preserves in-plane resolution
-- 📝 Updates DICOM metadata appropriately
-- 📏 Maintains proper physical dimensions
+Implementation details:
+- Multiple noise model support
+- Statistical property preservation
+- Image space noise application
+- Hounsfield Unit scale maintenance
 
-## 4. Noise Variations 📊
+### Beam Hardening Simulation
+Models dense structure artifacts through physics-based simulation.
 
-Simulates different types of noise commonly encountered in CT imaging.
+Components:
+- Polychromatic X-ray behavior modeling
+- Intensity-dependent attenuation
+- Cupping and streaking artifact simulation
+- Anatomical structure preservation
 
-### Parameters Tested:
-- 🌟 Low electronic noise: Gaussian (σ=30)
-- 🌟 Moderate electronic noise: Gaussian (σ=60)
-- 🌟 Heavy electronic noise: Gaussian (σ=100)
-- 🌟 Very high noise: Gaussian (σ=150)
-- 🌟 Typical artifacts: Salt & pepper (2% probability)
-- 🌟 Strong artifacts: Salt & pepper (5% probability)
-- 🌟 Severe artifacts: Salt & pepper (20% probability)
+### Ring Artifact Generation
+Simulates detector-based ring patterns.
 
-### Technical Implementation:
-- 🔧 Implements multiple noise models
-- 📊 Preserves underlying image statistics
-- 🎯 Applies noise in appropriate image space
-- 📏 Maintains proper HU scale
+Technical features:
+- Concentric ring pattern generation
+- Variable intensity implementation
+- Detector response simulation
+- Cross-slice consistency
 
-## 5. Beam Hardening 🌟
+### Patient Positioning Simulation
+Implements various patient positioning scenarios.
 
-Simulates beam hardening artifacts commonly seen around dense structures.
+Technical aspects:
+- 3D rotation matrix transformation
+- Dimension and scaling preservation
+- Anatomical relationship maintenance
+- Smooth rotation interpolation
 
-### Parameters Tested:
-- 🌟 Mild artifacts: 30% intensity, 180 HU threshold
-- 🌟 Moderate artifacts: 50% intensity, 250 HU threshold
-- 🌟 Strong artifacts: 80% intensity, 300 HU threshold
-- 🌟 Very strong artifacts: 90% intensity, 150 HU threshold
-- 🌟 Extreme artifacts: 100% intensity, 400 HU threshold
+Reference: `rotate_cli.py`
 
-### Technical Implementation:
-- 📡 Models polychromatic X-ray behavior
-- 🔍 Applies intensity-dependent attenuation
-- 🎯 Simulates cupping and streaking artifacts
-- 🔒 Preserves anatomical structures
+## 3. Output Structure and Visualization
 
-## 6. Ring Artifacts ⭕
-
-Simulates detector-related ring artifacts.
-
-### Parameters Tested:
-- 🌟 Subtle detector issues: 2 rings, 30% intensity, 2px thickness
-- 🌟 Moderate artifacts: 4 rings, 50% intensity, 2px thickness
-- 🌟 Multiple defects: 8 rings, 70% intensity, 3px thickness
-- 🌟 Multiple strong: 8 rings, 80% intensity, 4px thickness
-- 🌟 Maximum artifacts: 12 rings, 100% intensity, 5px thickness
-
-### Technical Implementation:
-- 🔄 Generates concentric ring patterns
-- 📊 Applies intensity variations
-- 📡 Simulates detector response characteristics
-- 🔒 Maintains artifact consistency across slices
-
-## 7. Patient Positioning Variations 🔄
-
-Simulates various patient positioning scenarios during scanning.
-
-### Parameters Tested:
-- 🌟 Slight head tilt: 5° around x-axis
-- 🌟 Moderate lateral tilt: 10° around y-axis
-- 🌟 Slight rotation: 8° around z-axis
-- 🌟 Large head tilt: 15° around x-axis
-- 🌟 Severe lateral tilt: 25° around y-axis
-- 🌟 Combined rotation: 10° around all axes
-
-### Technical Implementation:
-- 📐 Uses 3D rotation matrices for accurate transformation
-- 📏 Preserves image dimensions and scaling
-- 🔒 Maintains proper anatomical relationships
-- ✨ Implements interpolation for smooth rotations
-
-Reference implementation: `rotate_cli.py`
-
-## 📂 Output Structure
-
-All simulated artifacts are saved with the following structure:
-
-## 🖼️ Visualization Examples
-
-### Motion Artifacts
-![Motion Artifact Example](./output/motion/example_motion_5px.png)
-
-### Low-Dose Artifacts
-![Low Dose Example](./output/lowdose/example_30percent.png)
-
-### Slice Thickness Comparison
-![Slice Thickness Comparison](./output-augmentations/thickness_5.0mm/visualization/images_22620384/thickness_comparison.png)
-
-### Noise Variations
-![Noise Example](./output/noise/heavy_noise_example.png)
-
-### Beam Hardening
-![Beam Hardening Example](./output/beamhardening/strong_artifact.png)
-
-### Ring Artifacts
-![Ring Artifact Example](./output/rings/multiple_rings.png)
-
-## 📚 References
-
-Implementation details can be found in the following files:
-- 🌊 Motion artifacts: `motion_cli.py`
-- 📉 Undersampling: `undersample_cli.py`
-- 📏 Slice thickness: `slice_thickness_cli.py`
-- 📊 Noise: `noise_cli.py`
-- 🌟 Beam hardening: `beam_hardening_cli.py`
-- ⭕ Ring artifacts: `ring_cli.py`
+### Directory Structure
