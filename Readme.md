@@ -1,44 +1,69 @@
-# CT Noise Simulation Tools
+# CT Artifact Simulation Tools
 
 A collection of tools for simulating various types of noise and artifacts in CT scans. Designed for testing the robustness of medical image analysis algorithms.
 
 ## Table of Contents
+
 1. [Installation](#1-installation)
+   - [Prerequisites](#prerequisites)
+   - [Conda Environment Setup](#conda-environment-setup)
 2. [Usage](#2-usage)
-3. [Supported Augmentations](#3-supported-augmentations)
+   - [Basic Usage Pattern](#basic-usage-pattern)
+   - [Common Arguments](#common-arguments)
+3. [Supported Artifacts](#3-supported-artifacts)
+   - [Low-Dose Simulation](#31-low-dose-simulation)
+   - [Motion Artifacts](#32-motion-artifacts)
+   - [Noise Variations](#33-noise-variations)
+   - [Ring Artifacts](#34-ring-artifacts)
+   - [Beam Hardening](#35-beam-hardening)
 4. [Tool Reference](#4-tool-reference)
+   - [Basic Usage Examples](#basic-usage-examples)
+   - [Batch Processing](#batch-processing)
+5. [Output Structure](#5-output-structure)
+6. [Notes](#6-notes)
+   - [Implementation Details](#implementation-details)
+   - [Performance Considerations](#performance-considerations)
+   - [Quality Control](#quality-control)
+7. [Contributing](#contributing)
+8. [Acknowledgments](#acknowledgments)
 
 ## 1. Installation
 
-### 1.1 Conda Environment
-Create and activate conda environment:
+### Prerequisites
+- Python 3.10+
+- ASTRA Toolbox
+- CUDA-capable GPU (recommended)
 
-```bash
-conda create -n noise-simulation python=3.10
-conda activate noise-simulation
+### Conda Environment Setup
+
+```
+conda create -n noise-sim python=3.10
+conda activate noise-sim
 conda install pip
 pip install -e .
 ```
 
+
 ## 2. Usage
 
-Each tool can be run from the command line with various parameters. All tools support both single DICOM files and directories containing DICOM series.
+Each tool can be run independently from the command line. All tools support processing both individual DICOM files and directories containing DICOM series.
 
-### 2.1 Basic Usage Pattern
+### Basic Usage Pattern
+
 ```bash
 python <tool_name>.py /path/to/input /path/to/output [parameters]
 ```
 
-### 2.2 Common Arguments
+### Common Arguments
 All tools support these base arguments:
 - `input_dir`: Directory containing DICOM files
-- `output_dir`: Directory where processed files will be saved
-- `--visualize`: Generate visualization images (default: True)
+- `output_dir`: Directory for processed files
+- `--visualize`: Generate comparison visualizations (default: True)
 - `--no-visualize`: Disable visualization generation
 
-## 3. Supported Augmentations
+## 3. Supported Artifacts
 
-### 3.1 Undersampling (Low-Dose Simulation)
+### 3.1 Low-Dose Simulation
 Simulates low-dose CT by reducing the number of projections in sinogram space.
 
 **Parameters:**
@@ -64,8 +89,6 @@ Simulates realistic patient movement artifacts during CT acquisition, including 
   - Controls severity of motion artifacts in y direction
   - Larger values create more pronounced blurring and streaking
   - Typical range: 5-20 pixels
-- `--visualize`: Generate visualization images (default: True)
-- `--no-visualize`: Disable visualization generation
 
 **Impact:**
 - Creates two main types of artifacts:
@@ -88,40 +111,7 @@ Simulates realistic patient movement artifacts during CT acquisition, including 
 - Intensity of streaks proportional to edge contrast
 - Gaussian filtering applied for realistic smoothing
 
-### Usage Examples:
-```bash
-# Simulate subtle motion (e.g., slight patient movement)
-python motion_cli.py /path/to/input ./output \
-    --amplitude_x 5 \
-    --amplitude_y 0
-
-# Simulate strong horizontal motion
-python motion_cli.py /path/to/input ./output \
-    --amplitude_x 15 \
-    --amplitude_y 0
-
-# Simulate vertical motion
-python motion_cli.py /path/to/input ./output \
-    --amplitude_x 0 \
-    --amplitude_y 10
-```
-
-### 3.3 Beam Hardening
-Simulates beam hardening artifacts common in CT imaging.
-
-**Parameters:**
-- `--intensity` (0.0-1.0): Strength of beam hardening effect (default: 0.5)
-  - Controls the prominence of dark bands and cupping artifacts
-- `--threshold` (HU): Threshold for high-density objects (default: 200)
-  - Determines which structures cause streaking
-  - Typical range: 150-300 HU
-
-**Impact:**
-- Creates dark bands between dense objects
-- Produces cupping artifacts
-- More pronounced near metal/bone interfaces
-
-### 3.4 Gaussian Noise
+### 3.3 Noise Variations
 Adds random Gaussian noise to simulate various acquisition artifacts.
 
 **Parameters:**
@@ -135,7 +125,7 @@ Adds random Gaussian noise to simulate various acquisition artifacts.
 - Simulates electronic noise
 - Affects image contrast and detail visibility
 
-### 3.5 Ring Artifacts
+### 3.4 Ring Artifacts
 Simulates ring artifacts commonly caused by miscalibrated or defective detector elements in CT scanners.
 
 **Parameters:**
@@ -158,111 +148,77 @@ Simulates ring artifacts commonly caused by miscalibrated or defective detector 
 - More pronounced in areas of uniform density
 - Consistent across slices in 3D
 
-### 3.6 Slice Thickness Modification
-Simulates different slice thickness acquisitions through 3D resampling.
+### 3.5 Beam Hardening
+Simulates beam hardening artifacts common in CT imaging.
 
 **Parameters:**
-- `--thickness` (mm): Target slice thickness
-  - Must be specified
-  - Typical CT ranges:
-    - Thin slices: 0.5-1.5mm
-    - Standard slices: 2-3mm
-    - Thick slices: 5-10mm
+- `--intensity` (0.0-1.0): Strength of beam hardening effect (default: 0.5)
+  - Controls the prominence of dark bands and cupping artifacts
+- `--threshold` (HU): Threshold for high-density objects (default: 200)
+  - Determines which structures cause streaking
+  - Typical range: 150-300 HU
 
 **Impact:**
-- Affects z-axis resolution
-- Changes noise characteristics:
-  - Thicker slices reduce noise but decrease detail
-  - Thinner slices increase noise but improve detail
-- Modifies partial volume effects
-- Updates DICOM metadata to reflect new spacing
-
-**Technical Details:**
-- Uses cubic interpolation for high quality resampling
-- Preserves in-plane (x-y) resolution
-- Maintains proper physical dimensions
-- Updates relevant DICOM tags:
-  - SliceThickness
-  - SpacingBetweenSlices
-  - ImagePositionPatient
+- Creates dark bands between dense objects
+- Produces cupping artifacts
+- More pronounced near metal/bone interfaces
 
 ## 4. Tool Reference
 
-### 4.1 Undersampling Tool
+### Basic Usage Examples
 ```bash
-# Basic usage (90% dose)
-python undersample_cli.py /path/to/input ./output
-
-# High noise (50% dose)
-python undersample_cli.py /path/to/input ./output --dose 0.5
-
-# Disable visualization
-python undersample_cli.py /path/to/input ./output --dose 0.7 --no-visualize
-```
-
-### 4.2 Motion Artifact Tool
-```bash
-# Mild motion
+# Motion artifacts
 python motion_cli.py /path/to/input ./output --amplitude_x 5 --amplitude_y 0
 
-# Strong motion with high frequency
-python motion_cli.py /path/to/input ./output --amplitude_x 15 --amplitude_y 0 --frequency 2.0
+# Noise addition
+python noise_cli.py /path/to/input ./output --noise-type gaussian --std 50
+
+# Ring artifacts
+python ring_cli.py /path/to/input ./output --num-rings 3 --intensity 0.4 --thickness 2
+
+# Beam hardening
+python beam_hardening_cli.py /path/to/input ./output --intensity 0.4 --threshold 200
 ```
 
-### 4.3 Beam Hardening Tool
+### Batch Processing
 ```bash
-# Moderate beam hardening
-python beam_hardening_cli.py /path/to/input ./output --intensity 0.5
-
-# Strong artifacts with lower threshold
-python beam_hardening_cli.py /path/to/input ./output --intensity 0.8 --threshold 150
-```
-
-### 4.4 Noise Tool
-```bash
-# Add Gaussian noise
-python noise_cli.py /path/to/input ./output --noise-type gaussian --std 75
-
-# Add salt and pepper noise
-python noise_cli.py /path/to/input ./output --noise-type salt_and_pepper --prob 0.05
-```
-
-### 4.5 Ring Artifact Tool
-```bash
-# Basic ring artifacts
-python ring_cli.py /path/to/input ./output
-
-# Multiple pronounced rings
-python ring_cli.py /path/to/input ./output --num-rings 5 --intensity 0.8 --thickness 3
-
-# Control ring distribution
-python ring_cli.py /path/to/input ./output --min-radius 0.3 --max-radius 0.7
-```
-
-### 4.6 Slice Thickness Tool
-```bash
-# Increase slice thickness to 5mm
-python slice_thickness_cli.py /path/to/input ./output --thickness 5.0
-
-# Create thin slices (1mm)
-python slice_thickness_cli.py /path/to/input ./output --thickness 1.0
-
-# Thick slices without visualization
-python slice_thickness_cli.py /path/to/input ./output --thickness 7.5 --no-visualize
+# Example batch script
+./run_augs.sh
 ```
 
 ## 5. Output Structure
 ```
-output_dir/
-├── transform_name/              # Based on tool and parameters
-│   ├── visualization/          # If enabled
-│   │   └── comparison_*.png
-│   └── processed_files/
-│       └── [preserved input structure]
+output/
+├── transform_name/           # Based on artifact type and parameters
+│   ├── processed_files/     # Maintains input directory structure
+│   │   └── [DICOM files]
+│   └── visualization/       # If enabled
+│       └── [comparison images]
 ```
 
 ## 6. Notes
+
+### Implementation Details
 - All tools preserve DICOM metadata
-- Visualizations include side-by-side comparisons
-- Processing is done in 3D when appropriate
-- Tools can be interrupted safely with Ctrl+C
+- Interrupt processing safely with Ctrl+C
+- Visualization includes before/after comparisons
+- 3D consistency maintained where applicable
+
+### Performance Considerations
+- GPU acceleration available for supported operations
+- Batch processing recommended for large datasets
+- Progress bars indicate processing status
+
+### Quality Control
+- Visualization options for artifact verification
+- Maintains original DICOM tags for tracking
+- Directory structure preserved for easy comparison
+
+## Contributing
+Contributions are welcome! Please see our contributing guidelines for more details.
+
+## Acknowledgments
+- ASTRA Toolbox for CT simulation capabilities
+- PyDicom for DICOM file handling
+
+

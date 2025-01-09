@@ -88,6 +88,7 @@ def process_dicom_series(input_dir, output_dir, target_thickness, visualization_
     # Create visualizations if requested
     if visualization_dir:
         print("Generating visualizations...")
+        os.makedirs(visualization_dir, exist_ok=True)
         visualize_thickness_effect(volume, resampled, original_spacing, target_spacing, visualization_dir)
     
     # Save processed DICOM files
@@ -135,21 +136,21 @@ def visualize_thickness_effect(original, resampled, original_spacing, target_spa
     
     # Sagittal view
     mid_x = original.shape[2] // 2
-    axes[0, 0].imshow(original[:, :, mid_x], aspect=original_spacing[0]/original_spacing[1])
+    axes[0, 0].imshow(original[:, :, mid_x], cmap='gray', aspect=original_spacing[0]/original_spacing[1])
     axes[0, 0].set_title(f'Original Sagittal (thickness: {original_spacing[0]:.2f}mm)')
     axes[0, 0].axis('off')
     
-    axes[0, 1].imshow(resampled[:, :, mid_x], aspect=target_spacing[0]/target_spacing[1])
+    axes[0, 1].imshow(resampled[:, :, mid_x], cmap='gray', aspect=target_spacing[0]/target_spacing[1])
     axes[0, 1].set_title(f'Resampled Sagittal (thickness: {target_spacing[0]:.2f}mm)')
     axes[0, 1].axis('off')
     
     # Coronal view
     mid_y = original.shape[1] // 2
-    axes[1, 0].imshow(original[:, mid_y, :], aspect=original_spacing[0]/original_spacing[2])
+    axes[1, 0].imshow(original[:, mid_y, :], cmap='gray', aspect=original_spacing[0]/original_spacing[2])
     axes[1, 0].set_title(f'Original Coronal (thickness: {original_spacing[0]:.2f}mm)')
     axes[1, 0].axis('off')
     
-    axes[1, 1].imshow(resampled[:, mid_y, :], aspect=target_spacing[0]/target_spacing[2])
+    axes[1, 1].imshow(resampled[:, mid_y, :], cmap='gray', aspect=target_spacing[0]/target_spacing[2])
     axes[1, 1].set_title(f'Resampled Coronal (thickness: {target_spacing[0]:.2f}mm)')
     axes[1, 1].axis('off')
     
@@ -177,11 +178,8 @@ def main():
     transform_name = f"thickness_{args.thickness}mm"
     output_base = os.path.join(args.output_dir, transform_name)
     processed_dir = os.path.join(output_base, "processed_files")
-    visualization_dir = os.path.join(output_base, "visualization") if args.visualize else None
     
     os.makedirs(processed_dir, exist_ok=True)
-    if visualization_dir:
-        os.makedirs(visualization_dir, exist_ok=True)
 
     try:
         # Process each subdirectory maintaining the structure
@@ -198,12 +196,18 @@ def main():
             rel_path = os.path.relpath(root, args.input_dir)
             output_subdir = os.path.join(processed_dir, rel_path)
             
+            # Create visualization directory specific to this subdirectory
+            visualization_subdir = None
+            if args.visualize:
+                visualization_subdir = os.path.join(output_base, "visualization", rel_path)
+                os.makedirs(visualization_subdir, exist_ok=True)
+            
             print(f"\nProcessing directory: {root}")
             success = process_dicom_series(
                 root, 
                 output_subdir, 
                 args.thickness,
-                visualization_dir=visualization_dir if args.visualize else None
+                visualization_dir=visualization_subdir
             )
             if success:
                 print(f"Saved to: {output_subdir}")

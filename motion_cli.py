@@ -221,7 +221,11 @@ def process_dicom_series(input_dir, output_dir, motion_params, visualization_dir
     # Create visualizations if requested
     if visualization_dir:
         print("Generating visualizations...")
-        visualize_motion_effect(volume, motion_volume, visualization_dir)
+        # Create subdir-specific visualization directory
+        rel_path = os.path.basename(input_dir)
+        subdir_vis_path = os.path.join(visualization_dir, rel_path)
+        os.makedirs(subdir_vis_path, exist_ok=True)
+        visualize_motion_effect(volume, motion_volume, subdir_vis_path)
     
     # Convert back to DICOM
     print("Converting back to DICOM...")
@@ -293,7 +297,10 @@ def main():
             )
             if success:
                 print(f"Saved to: {output_subdir}")
-                
+                if args.visualize:
+                    vis_subdir = os.path.join(visualization_dir, os.path.relpath(root, args.input_dir))
+                    print(f"Visualizations saved to: {vis_subdir}")
+
     except KeyboardInterrupt:
         STOP_PROCESSING.set()
         print("\nInterrupted by user. Cleaning up...")

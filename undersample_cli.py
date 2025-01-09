@@ -9,6 +9,7 @@ import sys
 import threading
 import matplotlib.pyplot as plt
 import random
+import cv2
 
 STOP_PROCESSING = threading.Event()
 
@@ -89,6 +90,37 @@ def apply_window(image, center, width):
     return image
 
 
+def reduce_streak_artifacts(image, strength=0.7):
+    """
+    Reduce streak artifacts using directional filtering and edge preservation.
+    
+    Args:
+        image: Input image
+        strength: Strength of the correction (0-1)
+    """
+    # Create a copy to avoid modifying the original
+    processed = image.copy()
+    
+    # Apply bilateral filter to preserve edges while smoothing
+    bilateral = cv2.bilateralFilter(processed.astype(np.float32), 
+                                  d=9,  # Diameter of pixel neighborhood
+                                  sigmaColor=75, 
+                                  sigmaSpace=75)
+    
+    # Apply directional median filtering
+    kernel_size = 5
+    diagonal_kernel = np.eye(kernel_size, dtype=np.uint8)
+    anti_diagonal_kernel = np.fliplr(diagonal_kernel)
+    
+    # Apply median blur along main diagonal direction
+    diagonal_filtered = cv2.medianBlur(processed.astype(np.float32), kernel_size)
+    
+    # Combine the filters
+    result = (1 - strength) * processed + strength * (0.7 * bilateral + 0.3 * diagonal_filtered)
+    
+    return result
+
+
 def sim_low_dose(image, dose=0.9, image_min=None, image_max=None):
 
     if image_min is None:
@@ -107,6 +139,10 @@ def sim_low_dose(image, dose=0.9, image_min=None, image_max=None):
 
     recon = inv_ct_scan(sinogram, image.shape)
 
+    # Add streak reduction after reconstruction
+    if dose < 0.5:  # Only apply for significantly reduced dose
+        recon = reduce_streak_artifacts(recon, strength=0.7)
+    
     recon = recon * (image_max - image_min) + image_min
 
     return recon, sinogram
@@ -206,17 +242,16 @@ def main():
         vis_dir = os.path.join(output_base, 'visualization')
         os.makedirs(vis_dir, exist_ok=True)
 
-    # Store all DICOM files for random sampling
+    # First pass: collect all DICOM files with their relative paths
     dicom_files = []
-    
     try:
-        # First pass: collect all DICOM files
         for root, dirs, files in os.walk(args.input_dir):
             for file in files:
                 input_file = os.path.join(root, file)
                 try:
                     pydicom.dcmread(input_file, stop_before_pixels=True)
-                    dicom_files.append((root, file))
+                    rel_path = os.path.relpath(root, args.input_dir)
+                    dicom_files.append((root, file, rel_path))  # Added rel_path
                 except:
                     continue
         
@@ -225,9 +260,13 @@ def main():
             sample_files = random.sample(dicom_files, min(args.num_samples, len(dicom_files)))
             
             # Process samples and create visualizations
-            for idx, (root, file) in enumerate(sample_files):
+            for idx, (root, file, rel_path) in enumerate(sample_files):
                 input_file = os.path.join(root, file)
                 print(f"\nProcessing sample {idx+1}/{len(sample_files)}: {input_file}")
+                
+                # Create visualization subdirectory matching input structure
+                vis_subdir = os.path.join(vis_dir, rel_path)
+                os.makedirs(vis_subdir, exist_ok=True)
                 
                 # Read original DICOM
                 dcm = pydicom.dcmread(input_file)
@@ -238,9 +277,9 @@ def main():
                 
                 # Create and save visualization
                 fig = create_comparison_plot(original_image, low_dose_image, f"Dose {args.dose}")
-                fig.savefig(os.path.join(vis_dir, f'comparison_{idx+1}.png'))
+                fig.savefig(os.path.join(vis_subdir, f'comparison_{file}.png'))
                 plt.close(fig)
-        
+
         # Continue with normal processing
         for root, dirs, files in os.walk(args.input_dir):
             if STOP_PROCESSING.is_set():

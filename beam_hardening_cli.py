@@ -166,6 +166,12 @@ def visualize_beam_hardening(original_vol, hardened_vol, output_dir):
 
 def process_dicom_series(input_dir, output_dir, intensity, threshold, visualization_dir=None):
     """Process a series of DICOM files with beam hardening artifacts."""
+    # Get subdirectory-specific visualization path
+    if visualization_dir:
+        # Create visualization subdirectory matching input structure
+        viz_subdir = os.path.join(visualization_dir, os.path.basename(input_dir))
+        os.makedirs(viz_subdir, exist_ok=True)
+    
     # Collect DICOM files
     dicom_files = []
     for root, _, files in os.walk(input_dir):
@@ -192,7 +198,7 @@ def process_dicom_series(input_dir, output_dir, intensity, threshold, visualizat
     # Create visualizations if requested
     if visualization_dir:
         print("Generating visualizations...")
-        visualize_beam_hardening(volume, hardened_volume, visualization_dir)
+        visualize_beam_hardening(volume, hardened_volume, viz_subdir)
     
     # Convert back to DICOM
     print("Converting back to DICOM...")

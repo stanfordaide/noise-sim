@@ -174,8 +174,15 @@ def main():
                     output_subdir = os.path.join(processed_dir, rel_path)
                     os.makedirs(output_subdir, exist_ok=True)
                     
+                    # Create visualization subdir matching input structure
+                    if visualization_dir:
+                        vis_subdir = os.path.join(visualization_dir, rel_path)
+                        os.makedirs(vis_subdir, exist_ok=True)
+                        vis_path = os.path.join(vis_subdir, f"{os.path.splitext(file)[0]}_vis.png")
+                    else:
+                        vis_path = None
+                    
                     output_path = os.path.join(output_subdir, file)
-                    vis_path = os.path.join(visualization_dir, f"{os.path.splitext(file)[0]}_vis.png") if visualization_dir else None
                     
                     # Process the file
                     success = process_dicom(

@@ -233,11 +233,9 @@ def main():
     transform_name = f"ring_n{args.num_rings}_i{args.intensity}_t{args.thickness}"
     output_base = os.path.join(args.output_dir, transform_name)
     processed_dir = os.path.join(output_base, "processed_files")
-    visualization_dir = os.path.join(output_base, "visualization") if args.visualize else None
     
+    # Remove the single visualization_dir and handle it per subdirectory
     os.makedirs(processed_dir, exist_ok=True)
-    if visualization_dir:
-        os.makedirs(visualization_dir, exist_ok=True)
 
     try:
         # Process each subdirectory maintaining the structure
@@ -254,6 +252,12 @@ def main():
             rel_path = os.path.relpath(root, args.input_dir)
             output_subdir = os.path.join(processed_dir, rel_path)
             
+            # Create visualization directory specific to this subdirectory
+            visualization_subdir = None
+            if args.visualize:
+                visualization_subdir = os.path.join(output_base, "visualization", rel_path)
+                os.makedirs(visualization_subdir, exist_ok=True)
+            
             print(f"\nProcessing directory: {root}")
             success = process_dicom_series(
                 root, 
@@ -262,7 +266,7 @@ def main():
                 args.intensity,
                 args.thickness,
                 (args.min_radius, args.max_radius),
-                visualization_dir=visualization_dir if args.visualize else None
+                visualization_dir=visualization_subdir
             )
             if success:
                 print(f"Saved to: {output_subdir}")
