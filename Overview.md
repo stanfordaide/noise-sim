@@ -72,32 +72,42 @@ This document provides a comprehensive overview of the various CT artifacts that
 ## 2. Technical Implementation Details
 
 ### Motion Artifact Simulation
-Motion artifacts are simulated using the ASTRA toolbox for realistic patient movement effects during CT acquisition.
+Motion artifacts are simulated using the ASTRA toolbox with the following key components:
 
 Implementation characteristics:
 - Scanner geometry simulation:
   - Parallel beam geometry (672 detector pixels)
   - 360 projection angles over 2π radians
   - Strip-based projection model
-- Motion application during projection acquisition
-- Filtered Back Projection (FBP) reconstruction
-- Post-processing with Gaussian filtering
+- Motion simulation:
+  - Elastic deformation grid for realistic movement
+  - Independent X and Y motion parameters
+  - Random displacement vector generation
+- Reconstruction pipeline:
+  - Filtered Back Projection (FBP) reconstruction
+  - Post-processing with Gaussian filtering (σ=0.5)
+  - Intensity normalization and clipping
 
 Reference: `motion_cli.py`
 
 ### Low-Dose Simulation
-Implements reduced radiation dose effects through projection undersampling.
+Implements reduced radiation dose effects through:
 
 Technical approach:
-- ASTRA toolbox integration:
-  - Parallel beam geometry configuration
-  - Strip-based projector model
-  - Full 360° angular sampling
-- Projection count reduction proportional to dose
-- Noise characteristic preservation:
-  - Original projection statistics maintained
-  - Dose-dependent noise scaling
-- FBP reconstruction with adaptive filtering
+- Noise modeling:
+  - Poisson noise distribution simulation
+  - Alpha-controlled variance scaling
+  - Mean-preserving noise addition
+- Image processing:
+  - Hounsfield Unit rescaling
+  - Adaptive window level adjustment
+  - Streak artifact reduction:
+    - Bilateral filtering for edge preservation
+    - Directional median filtering
+    - Weighted combination of filters
+- Reconstruction:
+  - FBP with dose-dependent parameters
+  - Edge-preserving post-processing
 
 ### Slice Thickness Variation
 Implements variable slice thickness common in clinical protocols.
