@@ -2,6 +2,60 @@
 
 This document provides a comprehensive overview of the various CT artifacts that have been simulated in this project. Each artifact type is implemented to mimic realistic CT imaging challenges.
 
+## 0. Overview
+
+| Artifact Type | Description | Clinical Significance | Parameter Range |
+|--------------|-------------|----------------------|-----------------|
+| Motion | Patient movement during scan | Causes blurring and streaking | 3px - 30px movement |
+| Low-Dose | Reduced radiation exposure | Increased noise, reduced detail | 10% - 70% of normal dose |
+| Slice Thickness | Z-axis resolution variation | Affects detail visibility | 0.5mm - 10.0mm |
+| Noise | Electronic and quantum noise | Reduces image quality | σ=30 - 150 (Gaussian), 2-20% (Salt & Pepper) |
+| Beam Hardening | X-ray energy dependent artifacts | Dark bands near dense objects | 30% - 100% intensity |
+| Ring Artifacts | Detector calibration issues | Concentric rings in image | 2-12 rings, 30-100% intensity |
+| Patient Positioning | Patient orientation variations | Affects anatomical relationships | 5° - 25° rotations |
+
+### Detailed Augmentation Parameters
+
+| Category | Scenario | Parameters | Description |
+|----------|----------|------------|-------------|
+| **Slice Thickness** | Ultra-thin | 0.5mm | Highest resolution, increased noise |
+| | Thin | 1.0mm | High detail visualization |
+| | Standard | 2.5mm | Typical clinical protocol |
+| | Thick | 5.0mm | Reduced noise, less detail |
+| | Extra thick | 7.0mm | Further detail reduction |
+| | Very thick | 10.0mm | Maximum thickness tested |
+| **Noise** | Low | Gaussian σ=30 | Minimal electronic noise |
+| | Moderate | Gaussian σ=60 | Typical clinical noise |
+| | Heavy | Gaussian σ=100 | Challenging noise level |
+| | Very high | Gaussian σ=150 | Extreme noise case |
+| | Typical artifacts | S&P 2% | Common detector artifacts |
+| | Strong artifacts | S&P 5% | Significant artifacts |
+| | Severe artifacts | S&P 20% | Maximum artifact case |
+| **Motion** | Mild breathing | 3px X, 0px Y | Normal respiratory motion |
+| | Normal movement | 7px X, 2px Y | Typical patient movement |
+| | Large movement | 20px X, 10px Y | Significant motion |
+| | Extreme movement | 30px X, 15px Y | Worst-case scenario |
+| **Beam Hardening** | Mild | 30%, 180 HU | Minimal dark bands |
+| | Moderate | 50%, 250 HU | Typical clinical appearance |
+| | Strong | 80%, 300 HU | Pronounced artifacts |
+| | Very strong | 90%, 150 HU | Severe dark bands |
+| | Extreme | 100%, 400 HU | Maximum artifact case |
+| **Ring Artifacts** | Subtle | 2 rings, 30% | Minor detector issues |
+| | Moderate | 4 rings, 50% | Visible ring patterns |
+| | Multiple defects | 8 rings, 70% | Multiple detector problems |
+| | Multiple strong | 8 rings, 80% | Severe ring patterns |
+| | Maximum | 12 rings, 100% | Worst-case scenario |
+| **Low-Dose** | Moderate reduction | 70% dose | Minor quality impact |
+| | Significant reduction | 50% dose | Noticeable quality loss |
+| | Very low | 20% dose | Significant degradation |
+| | Ultra-low | 10% dose | Maximum dose reduction |
+| **Patient Positioning** | Slight head tilt | 5° X-axis | Minor misalignment |
+| | Moderate lateral | 10° Y-axis | Common positioning variation |
+| | Slight rotation | 8° Z-axis | Typical rotation |
+| | Large head tilt | 15° X-axis | Significant misalignment |
+| | Severe lateral | 25° Y-axis | Extreme positioning |
+| | Combined rotation | 10° all axes | Complex misalignment |
+
 ## 1. Motion Artifacts
 
 Motion artifacts are simulated using the ASTRA toolbox to recreate realistic patient movement effects during CT acquisition.
@@ -149,7 +203,7 @@ All simulated artifacts are saved with the following structure:
 ![Low Dose Example](./output/lowdose/example_30percent.png)
 
 ### Slice Thickness Comparison
-![Slice Thickness Comparison](./output/thickness/thickness_comparison.png)
+![Slice Thickness Comparison](./output-augmentations/thickness_5.0mm/visualization/images_22620384/thickness_comparison.png)
 
 ### Noise Variations
 ![Noise Example](./output/noise/heavy_noise_example.png)
