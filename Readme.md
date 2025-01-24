@@ -16,6 +16,7 @@ A collection of tools for simulating various types of noise and artifacts in CT 
    - [Noise Variations](#33-noise-variations)
    - [Ring Artifacts](#34-ring-artifacts)
    - [Beam Hardening](#35-beam-hardening)
+   - [Slice Thickness](#36-slice-thickness)
 4. [Tool Reference](#4-tool-reference)
    - [Basic Usage Examples](#basic-usage-examples)
    - [Batch Processing](#batch-processing)
@@ -64,104 +65,154 @@ All tools support these base arguments:
 ## 3. Supported Artifacts
 
 ### 3.1 Low-Dose Simulation
-Simulates low-dose CT by reducing the number of projections in sinogram space.
+Simulates reduced radiation dose effects through physics-based noise modeling and reconstruction.
 
 **Parameters:**
 - `--dose` (0.0-1.0): Simulates reduced radiation dose
-  - 1.0 = Original quality (no noise)
-  - 0.5 = Half dose (moderate noise)
-  - 0.1 = 10% dose (significant noise)
+  - 1.0 = Full dose (original quality)
+  - 0.7 = 30% dose reduction (mild noise)
+  - 0.5 = 50% dose reduction (moderate noise)
+  - 0.2 = 80% dose reduction (significant noise)
+  - 0.1 = 90% dose reduction (severe noise)
 
-**Impact:**
+**Technical Implementation:**
+- Noise modeling:
+  - Poisson noise distribution simulation
+  - Dose-dependent variance scaling
+  - Mean-preserving noise addition
+- Artifact reduction pipeline:
+  - Bilateral filtering for edge preservation
+  - Directional median filtering for streak reduction
+  - Adaptive filter strength based on dose level
+- Reconstruction considerations:
+  - Modified filtered back projection (FBP)
+  - Dose-dependent parameter optimization
+  - Edge-preserving post-processing
+
+**Clinical Impact:**
 - Lower dose values increase quantum noise
-- Affects image contrast and detail visibility
-- Realistic simulation of low-dose acquisition
+- Affects contrast-to-noise ratio
+- May impact fine detail visibility
+- Realistic simulation of dose reduction effects
 
 ### 3.2 Motion Artifacts
-Simulates realistic patient movement artifacts during CT acquisition, including blurring and streaking patterns based on actual CT physics.
+Simulates realistic patient movement artifacts during CT acquisition using ASTRA toolbox physics-based simulation.
 
 **Parameters:**
 - `--amplitude_x` (pixels): Magnitude of horizontal motion
   - Controls severity of motion artifacts in x direction
-  - Larger values create more pronounced blurring and streaking
-  - Typical range: 5-20 pixels
+  - Typical clinical range: 2-8 pixels
+  - Stress testing range: 10-30 pixels
 - `--amplitude_y` (pixels): Magnitude of vertical motion
   - Controls severity of motion artifacts in y direction
-  - Larger values create more pronounced blurring and streaking
-  - Typical range: 5-20 pixels
+  - Typical clinical range: 0-3 pixels
+  - Stress testing range: 4-15 pixels
 
-**Impact:**
-- Creates two main types of artifacts:
-  1. Blurring: General loss of sharpness
-  2. Streaking: Long-range streaks from high-contrast edges
-- Artifacts vary with:
-  - Local image contrast
-  - Motion amplitude and direction
-- More pronounced near:
-  - Bone-tissue interfaces
-  - Air-tissue boundaries
-  - Other high-contrast edges
+**Technical Implementation:**
+- Physics-based simulation using ASTRA toolbox:
+  - Parallel beam geometry with 672 detector pixels
+  - 360 projection angles over 2π radians
+  - Line-based projection model
+- Motion simulation characteristics:
+  - Random displacement vector generation
+  - Elastic deformation for realistic movement
+  - Gaussian filtering (σ=0.5) for smoothing
+- Maintains 3D consistency across slices
+- Intensity of artifacts proportional to:
+  - Motion amplitude
+  - Local tissue contrast
+  - Movement direction
 
-**Technical Details:**
-- Physics-based simulation using ASTRA toolbox considering:
-  - CT scanner geometry
-  - Projection-reconstruction process
-  - Filtered back projection (FBP) reconstruction
-- 3D consistent across slices
-- Intensity of streaks proportional to edge contrast
-- Gaussian filtering applied for realistic smoothing
+**Clinical Impact Levels:**
+1. Minimal (2px X, 0px Y): Slight breathing artifacts
+2. Mild (4px X, 1px Y): Normal patient movement
+3. Moderate (6px X, 2px Y): Noticeable motion
+4. Marked (8px X, 3px Y): Significant movement
+5. Severe (10px+ X, 4px+ Y): Major motion artifacts
 
 ### 3.3 Noise Variations
-Adds random Gaussian noise to simulate various acquisition artifacts.
+Simulates various types of noise artifacts commonly encountered in CT imaging.
 
 **Parameters:**
-- `--mean` (HU): Center of noise distribution (default: 0)
-- `--std` (HU): Standard deviation of noise (default: 50)
-  - Controls noise intensity
-  - Typical range: 20-100 HU
+- `--noise-type`: Type of noise to apply
+  - `gaussian`: Random Gaussian noise
+  - `salt_and_pepper`: Impulse noise simulating detector defects
+- For Gaussian noise:
+  - `--mean` (HU): Center of noise distribution (default: 0)
+  - `--std` (HU): Standard deviation of noise (default: 50)
+- For Salt & Pepper noise:
+  - `--prob`: Probability of noise occurrence (0.0-1.0)
+    - 0.05: Moderate detector defects
+    - 0.08: Significant detector issues
+    - 0.12: Major detector malfunction
 
-**Impact:**
-- Adds random variation to pixel values
-- Simulates electronic noise
-- Affects image contrast and detail visibility
+**Technical Implementation:**
+- Gaussian noise:
+  - Normal distribution sampling
+  - Independent noise per pixel
+  - Preserves image statistics
+- Salt & Pepper noise:
+  - Random binary mask generation
+  - Separate salt (max) and pepper (min) probabilities
+  - Simulates dead/hot detector elements
 
 ### 3.4 Ring Artifacts
-Simulates ring artifacts commonly caused by miscalibrated or defective detector elements in CT scanners.
+Simulates detector-based ring artifacts with realistic characteristics.
 
 **Parameters:**
-- `--num-rings` (integer): Number of rings to generate (default: 3)
-  - Controls density of artifacts
-  - Typical range: 2-10 rings
-- `--intensity` (0.0-1.0): Strength of ring artifacts (default: 0.5)
-  - Controls visibility of rings
-  - Higher values create more pronounced artifacts
-- `--thickness` (pixels): Width of rings (default: 2)
-  - Controls ring sharpness
-  - Larger values create broader rings
-- `--min-radius` (0.0-1.0): Minimum ring radius as fraction of image size (default: 0.2)
-- `--max-radius` (0.0-1.0): Maximum ring radius as fraction of image size (default: 0.8)
-  - Together control the distribution of ring sizes
+- `--num-defects`: Number of detector defects to simulate
+- `--intensity`: Relative intensity of defects (typically 1.12-1.15)
+- `--width`: Width of defect response in pixels
+- `--radius-min`, `--radius-max`: Ring radius range as fraction of image
+- `--angle-range`: Angular range of artifact visibility (degrees)
 
-**Impact:**
-- Creates concentric circular artifacts
-- Varies in intensity along the ring circumference
-- More pronounced in areas of uniform density
-- Consistent across slices in 3D
+**Technical Implementation:**
+- Detector response modeling:
+  - Clustered defect patterns (1-2 elements)
+  - Limited to 20% of detector width
+  - Dead (0.4×) and hot (1.3×) detector simulation
+- Spatial characteristics:
+  - Narrow defect width (1-3 pixels)
+  - Center-weighted positioning
+  - Angular consistency preservation
 
 ### 3.5 Beam Hardening
-Simulates beam hardening artifacts common in CT imaging.
+Simulates polychromatic X-ray beam artifacts.
 
 **Parameters:**
-- `--intensity` (0.0-1.0): Strength of beam hardening effect (default: 0.5)
-  - Controls the prominence of dark bands and cupping artifacts
-- `--threshold` (HU): Threshold for high-density objects (default: 200)
-  - Determines which structures cause streaking
-  - Typical range: 150-300 HU
+- `--intensity` (0.0-1.0): Strength of beam hardening effect
+  - 0.15: Minimal artifacts
+  - 0.3: Mild artifacts
+  - 0.45: Moderate artifacts
+  - 0.6: Marked artifacts
+- `--threshold` (HU): Density threshold for artifact generation
+  - 300: Minimal effect
+  - 262: Mild effect
+  - 225: Moderate effect
+  - 187: Marked effect
 
-**Impact:**
-- Creates dark bands between dense objects
-- Produces cupping artifacts
-- More pronounced near metal/bone interfaces
+**Technical Implementation:**
+- Signal handling for safe interruption
+- Progress tracking with tqdm
+- Visualization options for quality control
+- DICOM metadata preservation
+
+### 3.6 Slice Thickness
+Simulates variations in slice thickness reconstruction.
+
+**Parameters:**
+- `--thickness` (mm): Target slice thickness
+  - 2.0: Minimal change
+  - 3.5: Mild change
+  - 5.0: Moderate change
+  - 7.5: Marked change
+  - 10.0: Extreme change
+
+**Technical Implementation:**
+- Maintains DICOM metadata
+- Visualization comparison generation
+- Progress tracking
+- Interrupt-safe processing
 
 ## 4. Tool Reference
 
