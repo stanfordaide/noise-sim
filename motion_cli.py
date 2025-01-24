@@ -10,6 +10,7 @@ import signal as sys_signal
 import sys
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import scipy.ndimage
 
 STOP_PROCESSING = threading.Event()
 
@@ -25,7 +26,7 @@ def make_projector(angle, vol_geom, nr_detectors):
 
 def simulate_motion_artifact(slice_data, motion_params):
     """
-    Simulate motion artifacts using ASTRA toolbox approach.
+    Simulate motion artifacts using ASTRA toolbox approach with linear motion.
     
     Args:
         slice_data: 2D numpy array of single CT slice
@@ -45,27 +46,31 @@ def simulate_motion_artifact(slice_data, motion_params):
     # Initialize sinogram
     sinogram = np.zeros((nr_angles, nr_detectors))
     
-    # Calculate motion indices
-    angles_x = np.linspace(0, nr_angles, np.absolute(motion_params['amplitude_x'])+2).astype(np.int32)
-    angles_y = np.linspace(0, nr_angles, np.absolute(motion_params['amplitude_y'])+2).astype(np.int32)
-    
-    # Remove start/end angles
-    angles_x = angles_x[1:-1]
-    angles_y = angles_y[1:-1]
-    
-    # Combine motion angles
-    motion_angles = np.unique(np.concatenate((angles_x, angles_y)))
+    # Create linear motion profiles
+    if motion_params['amplitude_x'] != 0:
+        x_motion = np.linspace(-motion_params['amplitude_x']/2, 
+                             motion_params['amplitude_x']/2, 
+                             nr_angles)
+    else:
+        x_motion = np.zeros(nr_angles)
+        
+    if motion_params['amplitude_y'] != 0:
+        y_motion = np.linspace(-motion_params['amplitude_y']/2, 
+                             motion_params['amplitude_y']/2, 
+                             nr_angles)
+    else:
+        y_motion = np.zeros(nr_angles)
     
     # Simulate CT acquisition
     for i, angle in enumerate(angles):
         projector_id = make_projector(angle, vol_geom, nr_detectors)
         
-        # Apply motion at specified angles
-        if i in motion_angles:
-            if i in angles_x:
-                temp = np.roll(temp, np.sign(motion_params['amplitude_x']), axis=1)
-            if i in angles_y:
-                temp = np.roll(temp, np.sign(motion_params['amplitude_y']), axis=0)
+        # Apply linear shifts
+        if x_motion[i] != 0 or y_motion[i] != 0:
+            temp = scipy.ndimage.shift(slice_data, 
+                                     (y_motion[i], x_motion[i]), 
+                                     mode='reflect', 
+                                     order=1)
         
         # Create projection
         sino_id, sino = astra.creators.create_sino(temp, projector_id, returnData=True)

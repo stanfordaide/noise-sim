@@ -8,18 +8,18 @@ echo "Starting CT artifact simulation tests..."
 echo "Part 1: Testing realistic clinical scenarios..."
 
 # Slice thickness variations - clinical ranges
-echo "Testing typical clinical slice thickness modifications..."
-python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 1.0 --visualize  # Thin slices
-python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 2.5 --visualize  # Standard slices
-python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 5.0 --visualize  # Thick slices
-python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 7.0 --visualize  # Extra thick slices
+# echo "Testing typical clinical slice thickness modifications..."
+# python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 1.0 --visualize  # Thin slices
+# python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 2.5 --visualize  # Standard slices
+# python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 5.0 --visualize  # Thick slices
+# python slice_thickness_cli.py ./data/imbio ./output-augmentations --thickness 7.0 --visualize  # Extra thick slices
 
-# Noise variations - typical and clinical noise levels
-echo "Testing typical clinical noise levels..."
-python noise_cli.py ./data/imbio ./output-augmentations --noise-type gaussian --std 30 --visualize  # Low noise
-python noise_cli.py ./data/imbio ./output-augmentations --noise-type gaussian --std 60 --visualize  # Moderate noise
-python noise_cli.py ./data/imbio ./output-augmentations --noise-type gaussian --std 100 --visualize  # Heavy noise
-python noise_cli.py ./data/imbio ./output-augmentations --noise-type salt_and_pepper --prob 0.02 --visualize  # Typical artifact
+# # Noise variations - typical and clinical noise levels
+# echo "Testing typical clinical noise levels..."
+# python noise_cli.py ./data/imbio ./output-augmentations --noise-type gaussian --std 30 --visualize  # Low noise
+# python noise_cli.py ./data/imbio ./output-augmentations --noise-type gaussian --std 60 --visualize  # Moderate noise
+# python noise_cli.py ./data/imbio ./output-augmentations --noise-type gaussian --std 100 --visualize  # Heavy noise
+# python noise_cli.py ./data/imbio ./output-augmentations --noise-type salt_and_pepper --prob 0.02 --visualize  # Typical artifact
 python noise_cli.py ./data/imbio ./output-augmentations --noise-type salt_and_pepper --prob 0.05 --visualize  # Strong artifact
 
 # Motion artifacts - typical patient movement

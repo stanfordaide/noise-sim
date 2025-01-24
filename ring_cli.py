@@ -2,12 +2,13 @@ import os
 import argparse
 import pydicom
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 import threading
 import signal
 import sys
 from tqdm import tqdm
+import astra
+import matplotlib.pyplot as plt
 
 STOP_PROCESSING = threading.Event()
 
@@ -15,195 +16,249 @@ def signal_handler(signum, frame):
     print("\nInterrupt received. Cleaning up...")
     STOP_PROCESSING.set()
 
-def create_ring_artifact(shape, center=None, num_rings=3, intensity=1.0, thickness=2, radius_range=(0.2, 0.8)):
-    """
-    Create ring artifacts in a 2D image.
+def ct_scan(image):
+    """Convert image to sinogram using ASTRA with higher detector count."""
+    dx, dy = image.shape
+    vol_geom = astra.create_vol_geom(dx, dy)
+    # Increased number of detector pixels for better quality
+    proj_geom = astra.create_proj_geom('parallel', 1.0, 1024,
+                                      np.linspace(0, 2 * np.pi, 720, False))
     
-    Args:
-        shape: Shape of the image (height, width)
-        center: Center of rings (defaults to image center)
-        num_rings: Number of rings to generate
-        intensity: Strength of ring artifacts (-1.0 to 1.0)
-        thickness: Thickness of rings in pixels
-        radius_range: (min_radius, max_radius) as fraction of image size
-    """
-    if center is None:
-        center = np.array(shape) / 2
+    proj_id = astra.create_projector('strip', proj_geom, vol_geom)
+    sinogram_id, sinogram = astra.create_sino(image, proj_id)
     
-    # Create coordinate grid
-    y, x = np.ogrid[:shape[0], :shape[1]]
+    astra.data2d.delete(sinogram_id)
+    astra.projector.delete(proj_id)
     
-    # Calculate distances from center
-    distances = np.sqrt((x - center[1])**2 + (y - center[0])**2)
-    
-    # Initialize ring mask
-    ring_mask = np.zeros(shape)
-    
-    # Calculate min and max radii in pixels
-    min_radius = radius_range[0] * min(shape)
-    max_radius = radius_range[1] * min(shape)
-    
-    # Generate random radii for rings
-    radii = np.linspace(min_radius, max_radius, num_rings)
-    
-    # Create rings
-    for radius in radii:
-        # Create ring with specified thickness
-        ring = np.abs(distances - radius) < thickness/2
-        
-        # Add random intensity variation along the ring
-        angle = np.arctan2(y - center[0], x - center[1])
-        variation = np.sin(angle * np.random.randint(2, 6)) * 0.3
-        
-        # Add ring to mask with intensity variation
-        ring_mask += ring * (intensity * (1 + variation))
-    
-    return ring_mask
+    return sinogram
 
-def apply_ring_artifacts(volume, num_rings=3, intensity=1.0, thickness=2, radius_range=(0.2, 0.8)):
-    """
-    Apply ring artifacts to a 3D volume.
+def inv_ct_scan(sinogram, image_size):
+    """Reconstruct image from sinogram using ASTRA with FBP."""
+    vol_geom = astra.create_vol_geom(image_size[0], image_size[1])
+    proj_geom = astra.create_proj_geom('parallel', 1.0, 1024,
+                                      np.linspace(0, 2 * np.pi, sinogram.shape[0], False))
     
-    Args:
-        volume: 3D numpy array
-        num_rings: Number of rings per slice
-        intensity: Strength of ring artifacts
-        thickness: Thickness of rings in pixels
-        radius_range: (min_radius, max_radius) as fraction of image size
-    """
+    sinogram_id = astra.data2d.create('-sino', proj_geom, sinogram)
+    proj_id = astra.create_projector('strip', proj_geom, vol_geom)
+    rec_id = astra.data2d.create('-vol', vol_geom)
+    
+    # Use FBP for faster reconstruction
+    cfg = astra.astra_dict('FBP')
+    cfg['ReconstructionDataId'] = rec_id
+    cfg['ProjectionDataId'] = sinogram_id
+    cfg['ProjectorId'] = proj_id
+    
+    alg_id = astra.algorithm.create(cfg)
+    astra.algorithm.run(alg_id)  # FBP only needs one iteration
+    
+    image = astra.data2d.get(rec_id)
+    
+    astra.algorithm.delete(alg_id)
+    astra.data2d.delete(rec_id)
+    astra.data2d.delete(sinogram_id)
+    astra.projector.delete(proj_id)
+    
+    return image
+
+def create_detector_defects(sinogram_shape, num_defects, intensity, width, angle_range=360):
+    """Create realistic detector defects in sinogram space with smaller, more localized defects."""
+    detector_response = np.ones(sinogram_shape[1])
+    
+    # Calculate angular range indices
+    angle_start = (360 - angle_range) // 2
+    angle_end = angle_start + angle_range
+    angle_indices = np.arange(sinogram_shape[0])
+    angle_mask = (angle_indices >= (angle_start * sinogram_shape[0] / 360)) & \
+                (angle_indices <= (angle_end * sinogram_shape[0] / 360))
+    
+    # Limit defect region to 20% of detector width
+    detector_width = sinogram_shape[1]
+    max_defect_region = int(detector_width * 0.2)
+    center_pos = detector_width // 2
+    defect_region_start = center_pos - max_defect_region // 2
+    defect_region_end = center_pos + max_defect_region // 2
+    
+    # Create clustered defects in limited region
+    defect_positions = np.random.choice(
+        range(defect_region_start, defect_region_end),
+        size=num_defects//2,
+        replace=False
+    )
+    
+    for pos in defect_positions:
+        # Create smaller clusters (1-2 elements)
+        cluster_size = np.random.randint(1, 3)
+        for i in range(cluster_size):
+            defect_pos = pos + np.random.randint(-1, 2)
+            if defect_pos < defect_region_start or defect_pos >= defect_region_end:
+                continue
+                
+            # Create very narrow defect response
+            defect_width = np.random.randint(1, min(width + 1, 3))
+            start = max(defect_region_start, defect_pos - defect_width//2)
+            end = min(defect_region_end, defect_pos + defect_width//2 + 1)
+            
+            # More subtle intensity variations
+            defect_type = np.random.choice(['dead', 'hot'], p=[0.8, 0.2])
+            if defect_type == 'dead':
+                detector_response[start:end] *= 0.4  # Less extreme dead detector
+            else:
+                detector_response[start:end] *= 1.3  # More subtle hot detector
+    
+    return detector_response, angle_mask
+
+def apply_ring_artifacts(volume, num_defects=10, intensity=1.0, width=2, 
+                        radius_min=0.1, radius_max=0.9, angle_range=360):
+    """Apply ring artifacts using sinogram-based detector defects."""
     result = volume.copy()
     
-    # Create different ring patterns for each slice
     for z in range(volume.shape[0]):
-        # Create ring artifact pattern
-        rings = create_ring_artifact(
-            volume.shape[1:],
-            num_rings=num_rings,
-            intensity=intensity,
-            thickness=thickness,
-            radius_range=radius_range
+        # Convert to sinogram
+        sinogram = ct_scan(volume[z])
+        
+        # Create detector defects with angular limitation
+        detector_response, angle_mask = create_detector_defects(
+            sinogram.shape, num_defects, intensity, width, angle_range
         )
         
-        # Apply rings to slice
-        # Scale ring intensity by local image intensity to make artifacts more realistic
-        local_scale = np.clip(np.abs(volume[z]) / 1000, 0.1, 1.0)
-        result[z] += rings * local_scale * 100  # Scale factor for HU units
+        # Apply detector response only to specified angular range
+        sinogram_defective = sinogram.copy()
+        sinogram_defective[angle_mask] = sinogram[angle_mask] * detector_response[None, :]
+        
+        # Add subtle variations over projection angles
+        angle_variations = np.random.normal(1.0, 0.005, (sinogram.shape[0], 1))
+        sinogram_defective[angle_mask] *= angle_variations[angle_mask]
+        
+        # Reconstruct image
+        result[z] = inv_ct_scan(sinogram_defective, volume[z].shape)
     
     return result
 
-def visualize_ring_effect(original, ring_affected, output_dir):
-    """Create visualizations of ring artifacts in different planes."""
-    # Create directory for visualizations
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Get middle slices for each plane
-    z_mid = original.shape[0] // 2
-    y_mid = original.shape[1] // 2
-    x_mid = original.shape[2] // 2
-    
-    # Define planes and slices
-    planes = {
-        'Axial': (original[z_mid], ring_affected[z_mid]),
-        'Coronal': (original[:, y_mid], ring_affected[:, y_mid]),
-        'Sagittal': (original[:, :, x_mid], ring_affected[:, :, x_mid])
-    }
-    
-    # Create visualizations for each plane
-    for orientation, (orig_slice, ring_slice) in planes.items():
-        plt.figure(figsize=(12, 6))
-        
-        # Set consistent window for visualization
-        vmin = np.percentile(orig_slice, 1)
-        vmax = np.percentile(orig_slice, 99)
-        
-        # Create subplot for original image
-        plt.subplot(121)
-        plt.imshow(orig_slice, cmap='gray', vmin=vmin, vmax=vmax)
-        plt.title(f'Original {orientation}')
-        plt.axis('off')
-        
-        # Create subplot for ring-affected image
-        plt.subplot(122)
-        plt.imshow(ring_slice, cmap='gray', vmin=vmin, vmax=vmax)
-        plt.title(f'Ring Artifacts {orientation}')
-        plt.axis('off')
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'ring_artifacts_{orientation.lower()}.png'))
-        plt.close()
+def apply_window(image, center, width):
+    """Apply window/level to image for visualization."""
+    image = image.copy()
+    min_value = center - width // 2
+    max_value = center + width // 2
+    image[image < min_value] = min_value
+    image[image > max_value] = max_value
+    return (image - min_value) / (max_value - min_value)
 
-def process_dicom_series(input_dir, output_dir, num_rings, intensity, thickness, 
-                        radius_range, visualization_dir=None):
-    """Process a series of DICOM files with ring artifacts."""
-    # Collect DICOM files
-    dicom_files = []
-    for root, _, files in os.walk(input_dir):
-        for file in files:
-            try:
-                filepath = os.path.join(root, file)
-                pydicom.dcmread(filepath, stop_before_pixels=True)
-                dicom_files.append(filepath)
-            except:
-                continue
+def create_comparison_plot(original_image, artifact_image, title):
+    """Create side-by-side comparison plot."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
     
-    if not dicom_files:
-        print(f"No DICOM files found in {input_dir}")
+    # Calculate window/level automatically
+    window = 2000
+    center = 0
+    
+    # Apply same windowing to both images
+    orig_windowed = apply_window(original_image, center, window)
+    art_windowed = apply_window(artifact_image, center, window)
+    
+    ax1.imshow(orig_windowed, cmap='gray')
+    ax1.set_title('Original')
+    ax1.axis('off')
+    
+    ax2.imshow(art_windowed, cmap='gray')
+    ax2.set_title(f'Ring Artifacts ({title})')
+    ax2.axis('off')
+    
+    plt.tight_layout()
+    return fig
+
+def process_dicom(input_path, output_path, num_defects, intensity, width, visualize=False):
+    """Process a single DICOM file."""
+    if STOP_PROCESSING.is_set():
         return False
     
-    # Sort DICOM files by slice position
-    sorted_dicoms = []
-    for dcm_path in dicom_files:
-        dcm = pydicom.dcmread(dcm_path)
-        pos = tuple(map(float, dcm.ImagePositionPatient))
-        sorted_dicoms.append((pos[2], dcm_path))
-    sorted_dicoms.sort()
-    
-    # Create 3D volume
-    print("Converting DICOM series to volume...")
-    first_dcm = pydicom.dcmread(sorted_dicoms[0][1])
-    volume_shape = (len(sorted_dicoms), *first_dcm.pixel_array.shape)
-    volume = np.zeros(volume_shape)
-    
-    for i, (_, dcm_path) in enumerate(sorted_dicoms):
-        dcm = pydicom.dcmread(dcm_path)
-        volume[i] = dcm.pixel_array * dcm.RescaleSlope + dcm.RescaleIntercept
-    
-    # Apply ring artifacts
-    print("Applying ring artifacts...")
-    ring_volume = apply_ring_artifacts(
-        volume,
-        num_rings=num_rings,
-        intensity=intensity,
-        thickness=thickness,
-        radius_range=radius_range
-    )
-    
-    # Create visualizations if requested
-    if visualization_dir:
-        print("Generating visualizations...")
-        visualize_ring_effect(volume, ring_volume, visualization_dir)
-    
-    # Save processed DICOM files
-    print("Saving DICOM files...")
-    os.makedirs(output_dir, exist_ok=True)
-    
-    for i, (_, template_path) in enumerate(sorted_dicoms):
-        template = pydicom.dcmread(template_path)
+    try:
+        # Read DICOM
+        dcm = pydicom.dcmread(input_path)
+        image = dcm.pixel_array * dcm.RescaleSlope + dcm.RescaleIntercept
+        
+        # Apply ring artifacts
+        processed = apply_ring_artifacts(
+            image[None, ...],
+            num_defects=num_defects,
+            intensity=intensity,
+            width=width
+        )[0]
+        
+        # Create visualization if requested
+        if visualize:
+            vis_path = output_path.replace('.dcm', '_comparison.png')
+            fig = create_comparison_plot(
+                image, 
+                processed,
+                f"Defects: {num_defects}, Intensity: {intensity:.1f}"
+            )
+            fig.savefig(vis_path)
+            plt.close(fig)
         
         # Convert back to original scale
-        pixel_array = (ring_volume[i] - template.RescaleIntercept) / template.RescaleSlope
-        pixel_array = np.clip(pixel_array, np.min(template.pixel_array), np.max(template.pixel_array))
+        processed = ((processed - dcm.RescaleIntercept) / dcm.RescaleSlope).astype(dcm.pixel_array.dtype)
         
-        # Create new DICOM with ring artifacts
-        new_dcm = template.copy()
-        new_dcm.PixelData = pixel_array.astype(template.pixel_array.dtype).tobytes()
-        new_dcm.SeriesDescription = f"{template.get('SeriesDescription', 'Unknown')} - Ring artifacts"
+        # Create new DICOM
+        new_dcm = dcm.copy()
+        new_dcm.PixelData = processed.tobytes()
+        new_dcm.SeriesDescription = f"{dcm.get('SeriesDescription', 'Unknown')} - Ring Artifacts"
         
         # Save new DICOM
-        output_path = os.path.join(output_dir, os.path.basename(template_path))
         new_dcm.save_as(output_path)
-    
-    return True
+        return True
+        
+    except Exception as e:
+        print(f"Error processing {input_path}: {str(e)}")
+        return False
+    finally:
+        astra.clear()
+
+def process_dicom_series(input_dir, output_dir, num_defects, intensity, width, visualization_dir=None):
+    """Process all DICOM files in a directory."""
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Get list of files
+        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        
+        success_count = 0
+        for file in tqdm(files, desc="Processing files"):
+            if STOP_PROCESSING.is_set():
+                break
+                
+            input_path = os.path.join(input_dir, file)
+            output_path = os.path.join(output_dir, file)
+            
+            # Skip if output file already exists
+            if os.path.exists(output_path):
+                print(f"Skipping {input_path} - output already exists")
+                continue
+            
+            try:
+                # Quick check if file is DICOM
+                pydicom.dcmread(input_path, stop_before_pixels=True)
+                
+                # Process the DICOM file
+                visualize = visualization_dir is not None
+                if visualize:
+                    output_path_vis = os.path.join(visualization_dir, file)
+                else:
+                    output_path_vis = output_path
+                    
+                success = process_dicom(input_path, output_path_vis, 
+                                      num_defects, intensity, width, 
+                                      visualize=visualize)
+                if success:
+                    success_count += 1
+                    
+            except:
+                continue
+                
+        return success_count > 0
+        
+    except Exception as e:
+        print(f"Error processing directory {input_dir}: {str(e)}")
+        return False
 
 def main():
     STOP_PROCESSING.clear()
@@ -212,16 +267,18 @@ def main():
     parser = argparse.ArgumentParser(description='Add ring artifacts to DICOM images')
     parser.add_argument('input_dir', help='Input directory containing DICOM studies')
     parser.add_argument('output_dir', help='Output directory for artifact-affected DICOM files')
-    parser.add_argument('--num-rings', type=int, default=3,
-                       help='Number of rings to generate (default: 3)')
-    parser.add_argument('--intensity', type=float, default=0.5,
-                       help='Intensity of ring artifacts (0-1, default: 0.5)')
-    parser.add_argument('--thickness', type=int, default=2,
-                       help='Thickness of rings in pixels (default: 2)')
-    parser.add_argument('--min-radius', type=float, default=0.2,
-                       help='Minimum ring radius as fraction of image size (default: 0.2)')
-    parser.add_argument('--max-radius', type=float, default=0.8,
-                       help='Maximum ring radius as fraction of image size (default: 0.8)')
+    parser.add_argument('--num-defects', type=int, default=10,
+                       help='Number of detector defects to generate (default: 10)')
+    parser.add_argument('--intensity', type=float, default=1.0,
+                       help='Intensity of ring artifacts (0-2, default: 1.0)')
+    parser.add_argument('--width', type=int, default=2,
+                       help='Width of detector defects in pixels (default: 2)')
+    parser.add_argument('--radius-min', type=float, default=0.1,
+                       help='Minimum radius for ring artifacts (0-1, default: 0.1)')
+    parser.add_argument('--radius-max', type=float, default=0.9,
+                       help='Maximum radius for ring artifacts (0-1, default: 0.9)')
+    parser.add_argument('--angle-range', type=int, default=360,
+                       help='Angular range for artifacts in degrees (default: 360)')
     parser.add_argument('--visualize', action='store_true', default=True,
                        help='Generate visualization images (default: True)')
     parser.add_argument('--no-visualize', dest='visualize', action='store_false',
@@ -230,7 +287,7 @@ def main():
     args = parser.parse_args()
     
     # Create output directory structure
-    transform_name = f"ring_n{args.num_rings}_i{args.intensity}_t{args.thickness}"
+    transform_name = f"defects_{args.num_defects}_i{args.intensity}_w{args.width}_r{args.radius_min}-{args.radius_max}_a{args.angle_range}"
     output_base = os.path.join(args.output_dir, transform_name)
     processed_dir = os.path.join(output_base, "processed_files")
     
@@ -262,10 +319,9 @@ def main():
             success = process_dicom_series(
                 root, 
                 output_subdir, 
-                args.num_rings,
+                args.num_defects,
                 args.intensity,
-                args.thickness,
-                (args.min_radius, args.max_radius),
+                args.width,
                 visualization_dir=visualization_subdir
             )
             if success:
